@@ -1,0 +1,20 @@
+{
+  "name": "wirefactory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.15.0 <25", "npm": ">=12.0.1 <13" },
+  "scripts": {
+    "dev": "vite",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test:run": "vitest run",
+    "build": "tsc -b && vite build",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" vite.config.ts vitest.config.ts playwright.config.ts scripts/check-port-conflict.mjs",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" vite.config.ts vitest.config.ts playwright.config.ts scripts/check-port-conflict.mjs",
+    "test:port-conflict": "node scripts/check-port-conflict.mjs",
+    "test:e2e": "npm run build && playwright test"
+  },
+  "dependencies": { "pdf-lib": "^1.17.1", "react": "18.3.1", "react-dom": "18.3.1", "zustand": "4.5.7" },
+  "devDependencies": { "@playwright/test": "1.62.1", "@types/node": "24.10.1", "@types/react": "18.3.24", "@types/react-dom": "18.3.7", "@vitejs/plugin-react": "5.2.0", "prettier": "3.9.6", "typescript": "5.9.2", "vite": "7.3.6", "vitest": "3.2.7" }
+}
