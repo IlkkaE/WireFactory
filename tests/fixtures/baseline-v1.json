@@ -1,0 +1,286 @@
+{
+  "format": "wirefactory-project",
+  "version": 1,
+  "title": "2HB / 2V / 1T starter",
+  "expectation": {
+    "id": "starter-2hb-2v-1t",
+    "version": 1
+  },
+  "junctions": [],
+  "instances": [
+    {
+      "id": "neck",
+      "definitionId": "hb-2c-braid",
+      "definitionVersion": 1,
+      "pinoutId": "hb-2c-braid-generic",
+      "pinoutVersion": 1,
+      "label": "Neck humbucker",
+      "x": 35,
+      "y": 55,
+      "rotation": 0,
+      "values": {
+        "position": "neck"
+      }
+    },
+    {
+      "id": "bridge",
+      "definitionId": "hb-2c-braid",
+      "definitionVersion": 1,
+      "pinoutId": "hb-2c-braid-generic",
+      "pinoutVersion": 1,
+      "label": "Bridge humbucker",
+      "x": 35,
+      "y": 275,
+      "rotation": 0,
+      "values": {
+        "position": "bridge"
+      }
+    },
+    {
+      "id": "neck-volume",
+      "definitionId": "pot-500k-audio",
+      "definitionVersion": 1,
+      "pinoutId": "pot-500k-audio-generic",
+      "pinoutVersion": 1,
+      "label": "Neck volume",
+      "x": 255,
+      "y": 55,
+      "rotation": 0,
+      "values": {
+        "resistance": "500k",
+        "taper": "audio",
+        "control": "neck-volume"
+      }
+    },
+    {
+      "id": "bridge-volume",
+      "definitionId": "pot-500k-audio",
+      "definitionVersion": 1,
+      "pinoutId": "pot-500k-audio-generic",
+      "pinoutVersion": 1,
+      "label": "Bridge volume",
+      "x": 255,
+      "y": 275,
+      "rotation": 0,
+      "values": {
+        "resistance": "500k",
+        "taper": "audio",
+        "control": "bridge-volume"
+      }
+    },
+    {
+      "id": "selector",
+      "definitionId": "three-way-toggle",
+      "definitionVersion": 1,
+      "pinoutId": "three-way-toggle-generic",
+      "pinoutVersion": 1,
+      "label": "3-way selector",
+      "x": 475,
+      "y": 165,
+      "rotation": 0,
+      "values": {
+        "control": "selector"
+      }
+    },
+    {
+      "id": "tone",
+      "definitionId": "pot-500k-audio",
+      "definitionVersion": 1,
+      "pinoutId": "pot-500k-audio-generic",
+      "pinoutVersion": 1,
+      "label": "Master tone",
+      "x": 700,
+      "y": 275,
+      "rotation": 0,
+      "values": {
+        "resistance": "500k",
+        "taper": "audio",
+        "control": "tone"
+      }
+    },
+    {
+      "id": "cap",
+      "definitionId": "capacitor",
+      "definitionVersion": 1,
+      "pinoutId": "capacitor-generic",
+      "pinoutVersion": 1,
+      "label": "22 nF tone capacitor",
+      "x": 700,
+      "y": 430,
+      "rotation": 0,
+      "values": {
+        "capacitance": "22nF"
+      }
+    },
+    {
+      "id": "jack",
+      "definitionId": "mono-jack",
+      "definitionVersion": 1,
+      "pinoutId": "mono-jack-generic",
+      "pinoutVersion": 1,
+      "label": "Mono output jack",
+      "x": 700,
+      "y": 55,
+      "rotation": 0,
+      "values": {}
+    },
+    {
+      "id": "ground",
+      "definitionId": "junction",
+      "definitionVersion": 1,
+      "pinoutId": "junction-generic",
+      "pinoutVersion": 1,
+      "label": "Common ground",
+      "x": 475,
+      "y": 555,
+      "rotation": 0,
+      "values": {}
+    }
+  ],
+  "wires": [
+    {
+      "id": "w01",
+      "from": "neck:hot",
+      "to": "neck-volume:in",
+      "role": "signal",
+      "color": "#f0b35a",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w02",
+      "from": "neck-volume:out",
+      "to": "selector:neck",
+      "role": "signal",
+      "color": "#f0b35a",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w03",
+      "from": "bridge:hot",
+      "to": "bridge-volume:in",
+      "role": "signal",
+      "color": "#f0b35a",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w04",
+      "from": "bridge-volume:out",
+      "to": "selector:bridge",
+      "role": "signal",
+      "color": "#f0b35a",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w05",
+      "from": "selector:common",
+      "to": "jack:tip",
+      "role": "signal",
+      "color": "#f0b35a",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w06",
+      "from": "selector:common",
+      "to": "tone:in",
+      "role": "tone",
+      "color": "#60a5fa",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w07",
+      "from": "tone:out",
+      "to": "cap:a",
+      "role": "tone",
+      "color": "#60a5fa",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w08",
+      "from": "cap:b",
+      "to": "ground:node",
+      "role": "ground",
+      "color": "#9aa8b7",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w09",
+      "from": "neck:ground",
+      "to": "ground:node",
+      "role": "ground",
+      "color": "#9aa8b7",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w10",
+      "from": "neck:shield",
+      "to": "ground:node",
+      "role": "shield",
+      "color": "#7dd3fc",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w11",
+      "from": "bridge:ground",
+      "to": "ground:node",
+      "role": "ground",
+      "color": "#9aa8b7",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w12",
+      "from": "bridge:shield",
+      "to": "ground:node",
+      "role": "shield",
+      "color": "#7dd3fc",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w13",
+      "from": "neck-volume:ground",
+      "to": "ground:node",
+      "role": "ground",
+      "color": "#9aa8b7",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w14",
+      "from": "bridge-volume:ground",
+      "to": "ground:node",
+      "role": "ground",
+      "color": "#9aa8b7",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w15",
+      "from": "tone:ground",
+      "to": "ground:node",
+      "role": "ground",
+      "color": "#9aa8b7",
+      "label": "",
+      "waypoints": []
+    },
+    {
+      "id": "w16",
+      "from": "ground:node",
+      "to": "jack:sleeve",
+      "role": "ground",
+      "color": "#9aa8b7",
+      "label": "",
+      "waypoints": []
+    }
+  ]
+}

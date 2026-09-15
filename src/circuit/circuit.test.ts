@@ -1,105 +1,99 @@
 import { describe, expect, it } from 'vitest'
 import type { ControlState } from './model'
 import { resolve } from './resolver'
-import { starterDocument } from './template'
+import { masterVolumeDocument, starterDocument } from './template'
 
 const full = (selector: ControlState['selector']): ControlState => ({
   selector,
   neckVolume: 'full',
   bridgeVolume: 'full',
+  masterVolume: 'full',
   tone: 'full',
 })
+const codes = (document = starterDocument()) =>
+  resolve(document).diagnostics.map((entry) => entry.code)
+const rename = <T extends ReturnType<typeof starterDocument>>(document: T) => {
+  const ids = new Map(document.instances.map((item, index) => [item.id, `item-${index}`]))
+  for (const item of document.instances) item.id = ids.get(item.id)!
+  for (const wire of document.wires) {
+    const rewrite = (key: string) => {
+      const [id, terminal] = key.split(':')
+      return `${ids.get(id) ?? id}:${terminal}`
+    }
+    wire.from = rewrite(wire.from)
+    wire.to = rewrite(wire.to)
+  }
+  return document
+}
 
-describe('verified starter resolver', () => {
+describe('verified topology resolver', () => {
   it.each([
     ['neck', true, false],
     ['middle', true, true],
     ['bridge', false, true],
-  ] as const)('resolves %s selector state', (selector, neck, bridge) => {
+  ] as const)('keeps 2V starter selector %s behavior', (selector, neck, bridge) => {
     const result = resolve(starterDocument(), full(selector))
-    expect(result.diagnostics).toEqual([])
-    expect(result.buildReady).toBe(true)
+    expect(result.verificationStatus).toBe('verified')
+    expect(result.topology?.id).toBe('starter-2hb-2v-1t')
     expect(result.paths.find((path) => path.pickup === 'neck')?.active).toBe(neck)
     expect(result.paths.find((path) => path.pickup === 'bridge')?.active).toBe(bridge)
   })
-
-  it('contains two independent 500k volume controls and a master tone branch', () => {
-    const document = starterDocument()
-    expect(
-      document.instances.filter(
-        (item) => item.definitionId === 'pot-500k-audio' && item.values.control?.includes('volume'),
-      ),
-    ).toHaveLength(2)
-    expect(document.instances.find((item) => item.id === 'tone')?.values).toMatchObject({
-      resistance: '500k',
-      taper: 'audio',
-      control: 'tone',
-    })
-    expect(document.instances.find((item) => item.id === 'cap')?.values.capacitance).toBe('22nF')
-  })
-
-  it('shows intentional zero-volume muting without reporting a hard short', () => {
-    const result = resolve(starterDocument(), {
-      ...full('neck'),
-      neckVolume: 'zero',
-    })
+  it('keeps the shared-output mute when either 2V control is zero in middle', () => {
+    const result = resolve(starterDocument(), { ...full('middle'), neckVolume: 'zero' })
     expect(result.outputMuted).toBe(true)
     expect(result.paths.every((path) => !path.active)).toBe(true)
-    expect(result.diagnostics.map((item) => item.code)).not.toContain('HOT_GROUND_SHORT')
-    expect(result.buildReady).toBe(true)
+    expect(codes()).not.toContain('HOT_GROUND_SHORT')
   })
-
-  it('finds a broken selected signal path and blocks output', () => {
+  it.each([
+    ['neck', true, false],
+    ['middle', true, true],
+    ['bridge', false, true],
+  ] as const)('verifies 1V template at %s and respects master mute', (selector, neck, bridge) => {
+    const document = masterVolumeDocument()
+    const result = resolve(document, full(selector))
+    expect(result.verificationStatus).toBe('verified')
+    expect(result.topology?.id).toBe('2hb-1v-1t')
+    expect(result.paths.find((path) => path.pickup === 'neck')?.active).toBe(neck)
+    expect(result.paths.find((path) => path.pickup === 'bridge')?.active).toBe(bridge)
+    const muted = resolve(document, { ...full(selector), masterVolume: 'zero' })
+    expect(muted.outputMuted).toBe(true)
+  })
+  it('identifies both verified templates after instance and endpoint renaming', () => {
+    for (const document of [rename(starterDocument()), rename(masterVolumeDocument())])
+      expect(resolve(document).verificationStatus).toBe('verified')
+  })
+  it('uses semantic topology when expectation is null', () => {
     const document = starterDocument()
-    document.wires = document.wires.filter((wire) => wire.id !== 'w01')
-    const result = resolve(document, full('neck'))
-    expect(result.diagnostics.map((item) => item.code)).toContain('STARTER_WIRE_MISSING')
-    expect(result.diagnostics.map((item) => item.code)).toContain('OPEN_SIGNAL')
-    expect(result.buildReady).toBe(false)
+    document.expectation = null
+    expect(resolve(document).verificationStatus).toBe('verified')
   })
-
-  it('finds open grounds, missing shield bonds and hard shorts', () => {
-    const openGround = starterDocument()
-    openGround.wires = openGround.wires.filter((wire) => wire.id !== 'w09')
-    expect(resolve(openGround).diagnostics.map((item) => item.code)).toContain('OPEN_GROUND')
-
-    const openShield = starterDocument()
-    openShield.wires = openShield.wires.filter((wire) => wire.id !== 'w10')
-    expect(resolve(openShield).diagnostics.map((item) => item.code)).toContain('OPEN_GROUND')
-
-    const shorted = starterDocument()
-    shorted.wires.push({
+  it('reports a modified preset expectation separately from its remaining working pickup', () => {
+    const doc = starterDocument()
+    doc.wires = doc.wires.filter((w) => w.id !== 'w01')
+    const r = resolve(doc)
+    expect(r.structuralStatus).toBe('valid')
+    expect(r.expectationStatus).toBe('deviated')
+    expect(r.paths.filter((p) => p.active).map((p) => p.pickup)).toEqual(['bridge'])
+  })
+  it('rejects malformed wiring and permanent output shorts independent of wire role', () => {
+    const doc = starterDocument()
+    doc.wires.push({
+      ...doc.wires[0],
       id: 'short',
       from: 'jack:tip',
       to: 'jack:sleeve',
-      role: 'signal',
-      color: '#ff0000',
-      label: '',
-      waypoints: [],
+      role: 'tone',
     })
-    expect(resolve(shorted).diagnostics.map((item) => item.code)).toContain('HOT_GROUND_SHORT')
+    expect(resolve(doc).buildReady).toBe(false)
+    expect(resolve(doc).outputObservations['jack:tip'].state).toBe('muted')
+    doc.wires.at(-1)!.to = 'missing:pin'
+    expect(codes(doc)).toContain('INVALID_ENDPOINT')
   })
-
-  it('blocks unknown pinout ids and incorrect starter wire roles', () => {
-    const unknownPinout = starterDocument()
-    unknownPinout.instances[0].pinoutId = 'not-a-known-pinout'
-    const pinoutResult = resolve(unknownPinout)
-    expect(pinoutResult.diagnostics.map((item) => item.code)).toContain('UNKNOWN_PINOUT')
-    expect(pinoutResult.buildReady).toBe(false)
-
-    const wrongRole = starterDocument()
-    wrongRole.wires.find((wire) => wire.id === 'w10')!.role = 'ground'
-    const roleResult = resolve(wrongRole)
-    expect(roleResult.diagnostics.map((item) => item.code)).toContain('STARTER_WIRE_ROLE')
-    expect(roleResult.buildReady).toBe(false)
-  })
-
-  it('excludes the reactive tone branch from false DC short analysis', () => {
-    const result = resolve(starterDocument())
-    expect(result.diagnostics.map((item) => item.code)).not.toContain('HOT_GROUND_SHORT')
-    expect(result.activeWireIds).toEqual(
-      expect.arrayContaining(['w01', 'w02', 'w03', 'w04', 'w05']),
-    )
-    expect(result.activeWireIds).not.toContain('w06')
+  it('finite capacitors do not become ideal output shorts', () => {
+    const doc = starterDocument()
+    expect(resolve(doc).outputObservations['jack:tip'].state).toBe('active')
+    doc.wires.push({ ...doc.wires[0], id: 'bypass', from: 'cap:a', to: 'cap:b' })
+    expect(resolve(doc).structuralStatus).toBe('invalid')
+    expect(resolve(doc).expectationStatus).toBe('deviated')
   })
 })

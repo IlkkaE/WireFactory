@@ -42,6 +42,13 @@ function parseInstance(value: unknown): Instance {
   ) {
     throw new Error(`Invalid component coordinates: ${id}`)
   }
+  if (
+    item.contactModel &&
+    value.controlState !== undefined &&
+    (typeof value.controlState !== 'string' ||
+      !item.contactModel.states.some((state) => state.id === value.controlState))
+  )
+    throw new Error('Invalid switch state: ' + id)
   if (!isRecord(value.values)) throw new Error(`Invalid component values: ${id}`)
   return {
     id,
@@ -131,7 +138,14 @@ export function parseProject(text: string): WireFactoryDocument {
   const expectation = value.expectation
   if (
     expectation !== null &&
-    (!isRecord(expectation) || expectation.id !== 'starter-2hb-2v-1t' || expectation.version !== 1)
+    (!isRecord(expectation) ||
+      ![
+        'starter-2hb-2v-1t',
+        '2hb-1v-1t',
+        '2hb-1v-1t-split-push-pull',
+        '2hb-1v-1t-split-push-push',
+      ].includes(String(expectation.id)) ||
+      expectation.version !== 1)
   ) {
     throw new Error('Unknown circuit expectation.')
   }

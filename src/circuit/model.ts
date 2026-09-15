@@ -6,6 +6,21 @@ export type TerminalRole =
 export type WireRole = 'signal' | 'ground' | 'tone' | 'shield'
 export type SelectorState = 'neck' | 'middle' | 'bridge'
 export type PotState = 'zero' | 'mid' | 'full'
+export type RuntimeBehavior =
+  | 'pickup'
+  | 'potentiometer'
+  | 'selector-3way'
+  | 'capacitor'
+  | 'mono-jack'
+  | 'junction'
+  | 'unsupported'
+export type VerificationStatus = 'verified' | 'invalid' | 'unknown' | 'unsupported'
+
+export type ContactState = { id: string; label: string; pairs: [string, string][] }
+export interface ContactModel {
+  defaultState: string
+  states: ContactState[]
+}
 
 export interface Definition {
   id: string
@@ -19,6 +34,12 @@ export interface Definition {
   sourceUrl: string
   limitation: string
   starterVerified: boolean
+  /** Catalog-only runtime model; never serialized into a project. */
+  electricalModel?: 'pickup' | 'potentiometer' | 'passive' | 'contacts' | 'output' | 'ground'
+  behavior: RuntimeBehavior
+  /** Logical generic contacts only; never a claim about physical lug order. */
+  coils?: { id: string; start: string; finish: string }[]
+  contactModel?: ContactModel
 }
 
 export interface Instance {
@@ -66,6 +87,7 @@ export interface ControlState {
   neckVolume: PotState
   bridgeVolume: PotState
   tone: PotState
+  masterVolume: PotState
 }
 
 export const DEFAULT_CONTROLS: ControlState = {
@@ -73,11 +95,12 @@ export const DEFAULT_CONTROLS: ControlState = {
   neckVolume: 'full',
   bridgeVolume: 'full',
   tone: 'full',
+  masterVolume: 'full',
 }
 
 export const terminalKey = (instanceId: string, terminalId: string) => `${instanceId}:${terminalId}`
 
 export const splitTerminalKey = (key: string): [string, string] => {
-  const separator = key.indexOf(':')
+  const separator = key.lastIndexOf(':')
   return separator < 1 ? [key, ''] : [key.slice(0, separator), key.slice(separator + 1)]
 }

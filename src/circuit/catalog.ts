@@ -1,4 +1,4 @@
-import type { Definition, TerminalRole } from './model'
+import type { Definition, RuntimeBehavior, TerminalRole } from './model'
 
 type Source = { label: string; url: string }
 type Terminal = { id: string; role: TerminalRole; label: string }
@@ -30,6 +30,8 @@ const make = (
   source: Source = PICKUP,
   limitation = 'Generic schematic symbol. Confirm the physical component pinout before soldering.',
   starterVerified = false,
+  behavior: RuntimeBehavior = 'unsupported',
+  contactModel?: Definition['contactModel'],
 ): Definition => ({
   id,
   version: 1,
@@ -42,6 +44,8 @@ const make = (
   sourceUrl: source.url,
   limitation,
   starterVerified,
+  behavior,
+  ...(contactModel ? { contactModel } : {}),
 })
 
 const pickup: Terminal[] = [
@@ -96,6 +100,7 @@ export const catalog: Definition[] = [
     PICKUP,
     'The braid may combine signal cold and shield; verify the maker drawing.',
     true,
+    'pickup',
   ),
   make(
     'hb-4c-shield',
@@ -126,6 +131,7 @@ export const catalog: Definition[] = [
     POT,
     'Lug order depends on viewing direction; confirm it physically.',
     true,
+    'potentiometer',
   ),
   make(
     'pot-1m-audio',
@@ -164,6 +170,19 @@ export const catalog: Definition[] = [
     POT,
   ),
   make(
+    'stacked-pot',
+    'Stacked / concentric potentiometer',
+    'Controls',
+    'Two independent three-lug controls on one shaft.',
+    'Concentric volume and tone control.',
+    [
+      ...pot.map((t) => ({ ...t, id: 'upper-' + t.id, label: 'Upper ' + t.label })),
+      ...pot.map((t) => ({ ...t, id: 'lower-' + t.id, label: 'Lower ' + t.label })),
+    ],
+    POT,
+    'Generic dual-gang symbol; confirm shaft and lug orientation.',
+  ),
+  make(
     'no-load',
     'No-load tone potentiometer',
     'Controls',
@@ -186,6 +205,7 @@ export const catalog: Definition[] = [
     SWITCH,
     'WireFactory logical matrix; lug placement varies by product.',
     true,
+    'selector-3way',
   ),
   make(
     'three-way-blade',
@@ -206,13 +226,42 @@ export const catalog: Definition[] = [
     SWITCH,
   ),
   make(
-    'spst-on-on',
-    'SPST on/on switch',
+    'spst-on-off',
+    'SPST on/off mini switch',
     'Switches',
-    'Single circuit with two connected states.',
+    'One circuit that is either open or closed.',
     'Simple kill, bypass or add-pickup function.',
     contacts(['a', 'b']),
     SWITCH,
+    'Generic logical contacts; verify physical lug orientation.',
+    false,
+    'unsupported',
+    {
+      defaultState: 'off',
+      states: [
+        { id: 'off', label: 'OFF', pairs: [] },
+        { id: 'on', label: 'ON', pairs: [['a', 'b']] },
+      ],
+    },
+  ),
+  make(
+    'spst-on-on',
+    'SPST on/off switch (legacy ID)',
+    'Switches',
+    'Deprecated legacy identifier retained for existing project files.',
+    'Simple kill, bypass or add-pickup function.',
+    contacts(['a', 'b']),
+    SWITCH,
+    'Legacy generic on/off mapping; retained without identifier migration.',
+    false,
+    'unsupported',
+    {
+      defaultState: 'off',
+      states: [
+        { id: 'off', label: 'OFF', pairs: [] },
+        { id: 'on', label: 'ON', pairs: [['a', 'b']] },
+      ],
+    },
   ),
   make(
     'spdt-on-on',
@@ -222,6 +271,26 @@ export const catalog: Definition[] = [
     'Choose between two signal sources.',
     contacts(['a', 'common', 'b']),
     SWITCH,
+  ),
+  make(
+    'spdt-on-off-on',
+    'SPDT on/off/on mini switch',
+    'Switches',
+    'One common selects either throw, with a centre-off state.',
+    'Three-state pickup or bypass selection.',
+    contacts(['a', 'common', 'b']),
+    SWITCH,
+    'Generic logical contacts; verify physical lug orientation.',
+    false,
+    'unsupported',
+    {
+      defaultState: 'off',
+      states: [
+        { id: 'on-a', label: 'A', pairs: [['common', 'a']] },
+        { id: 'off', label: 'OFF', pairs: [] },
+        { id: 'on-b', label: 'B', pairs: [['common', 'b']] },
+      ],
+    },
   ),
   make(
     'dpdt-on-on',
@@ -237,7 +306,7 @@ export const catalog: Definition[] = [
     'DPDT on/off/on switch',
     'Switches',
     'Two poles with a centre-off position.',
-    'Three-state coil selection with a verified matrix.',
+    'Three-state coil selection; generic logical contact model.',
     dpdt,
     SWITCH,
   ),
@@ -290,6 +359,7 @@ export const catalog: Definition[] = [
     PICKUP,
     'V1 lists capacitance but does not simulate frequency response.',
     true,
+    'capacitor',
   ),
   make(
     'resistor',
@@ -326,6 +396,7 @@ export const catalog: Definition[] = [
     JACK,
     'Terminal orientation varies; continuity-test the real jack.',
     true,
+    'mono-jack',
   ),
   make(
     'stereo-jack',
@@ -366,8 +437,281 @@ export const catalog: Definition[] = [
     JACK,
     'A schematic junction does not prescribe a physical ground layout.',
     true,
+    'junction',
   ),
 ]
 
+export const contactModels: Record<string, Definition['contactModel']> = {
+  'spdt-on-on': {
+    defaultState: 'on-a',
+    states: [
+      { id: 'on-a', label: 'A', pairs: [['common', 'a']] },
+      { id: 'on-b', label: 'B', pairs: [['common', 'b']] },
+    ],
+  },
+  'three-way-toggle': {
+    defaultState: 'middle',
+    states: [
+      { id: 'neck', label: 'Neck', pairs: [['neck', 'common']] },
+      {
+        id: 'middle',
+        label: 'Both',
+        pairs: [
+          ['neck', 'common'],
+          ['bridge', 'common'],
+        ],
+      },
+      { id: 'bridge', label: 'Bridge', pairs: [['bridge', 'common']] },
+    ],
+  },
+  'three-way-blade': {
+    defaultState: 'middle',
+    states: [
+      {
+        id: 'neck',
+        label: '1',
+        pairs: [
+          ['a0', 'a1'],
+          ['b0', 'b1'],
+        ],
+      },
+      {
+        id: 'middle',
+        label: '2',
+        pairs: [
+          ['a0', 'a2'],
+          ['b0', 'b2'],
+        ],
+      },
+      {
+        id: 'bridge',
+        label: '3',
+        pairs: [
+          ['a0', 'a3'],
+          ['b0', 'b3'],
+        ],
+      },
+    ],
+  },
+  'five-way-blade': {
+    defaultState: 'three',
+    states: [
+      {
+        id: 'one',
+        label: '1',
+        pairs: [
+          ['a0', 'a1'],
+          ['b0', 'b1'],
+        ],
+      },
+      {
+        id: 'two',
+        label: '2',
+        pairs: [
+          ['a0', 'a1'],
+          ['a0', 'a2'],
+          ['b0', 'b1'],
+          ['b0', 'b2'],
+        ],
+      },
+      {
+        id: 'three',
+        label: '3',
+        pairs: [
+          ['a0', 'a2'],
+          ['b0', 'b2'],
+        ],
+      },
+      {
+        id: 'four',
+        label: '4',
+        pairs: [
+          ['a0', 'a2'],
+          ['a0', 'a3'],
+          ['b0', 'b2'],
+          ['b0', 'b3'],
+        ],
+      },
+      {
+        id: 'five',
+        label: '5',
+        pairs: [
+          ['a0', 'a3'],
+          ['b0', 'b3'],
+        ],
+      },
+    ],
+  },
+  'dpdt-on-on': {
+    defaultState: 'on-a',
+    states: [
+      {
+        id: 'on-a',
+        label: 'A',
+        pairs: [
+          ['a2', 'a1'],
+          ['b2', 'b1'],
+        ],
+      },
+      {
+        id: 'on-b',
+        label: 'B',
+        pairs: [
+          ['a2', 'a3'],
+          ['b2', 'b3'],
+        ],
+      },
+    ],
+  },
+  'dpdt-on-off-on': {
+    defaultState: 'off',
+    states: [
+      {
+        id: 'on-a',
+        label: 'A',
+        pairs: [
+          ['a2', 'a1'],
+          ['b2', 'b1'],
+        ],
+      },
+      { id: 'off', label: 'OFF', pairs: [] },
+      {
+        id: 'on-b',
+        label: 'B',
+        pairs: [
+          ['a2', 'a3'],
+          ['b2', 'b3'],
+        ],
+      },
+    ],
+  },
+  'dpdt-on-on-on': {
+    defaultState: 'center',
+    states: [
+      {
+        id: 'on-a',
+        label: 'A',
+        pairs: [
+          ['a2', 'a1'],
+          ['b2', 'b1'],
+        ],
+      },
+      {
+        id: 'center',
+        label: 'Centre',
+        pairs: [
+          ['a2', 'a1'],
+          ['b2', 'b3'],
+        ],
+      },
+      {
+        id: 'on-b',
+        label: 'B',
+        pairs: [
+          ['a2', 'a3'],
+          ['b2', 'b3'],
+        ],
+      },
+    ],
+  },
+  'push-pull-dpdt': {
+    defaultState: 'full',
+    states: [
+      {
+        id: 'full',
+        label: 'A / down',
+        pairs: [
+          ['a2', 'a1'],
+          ['b2', 'b1'],
+        ],
+      },
+      {
+        id: 'split',
+        label: 'B / actuated',
+        pairs: [
+          ['a2', 'a3'],
+          ['b2', 'b3'],
+        ],
+      },
+    ],
+  },
+  'push-push-dpdt': {
+    defaultState: 'full',
+    states: [
+      {
+        id: 'full',
+        label: 'A / down',
+        pairs: [
+          ['a2', 'a1'],
+          ['b2', 'b1'],
+        ],
+      },
+      {
+        id: 'split',
+        label: 'B / actuated',
+        pairs: [
+          ['a2', 'a3'],
+          ['b2', 'b3'],
+        ],
+      },
+    ],
+  },
+  'four-pole-five-throw': {
+    defaultState: 'one',
+    states: ['one', 'two', 'three', 'four', 'five'].map((id, index) => ({
+      id,
+      label: String(index + 1),
+      pairs: ['a', 'b', 'c', 'd'].map(
+        (pole) => [pole + 'c', pole + String(index + 1)] as [string, string],
+      ),
+    })),
+  },
+}
+for (const entry of catalog) {
+  if (contactModels[entry.id]) entry.contactModel = contactModels[entry.id]
+}
+for (const id of ['push-pull-dpdt', 'push-push-dpdt']) {
+  const entry = catalog.find((item) => item.id === id)
+  if (entry) entry.behavior = 'potentiometer'
+}
+
 export const definition = (id: string) => catalog.find((entry) => entry.id === id)
 export const catalogCategories = Array.from(new Set(catalog.map((entry) => entry.category)))
+
+const hb4 = catalog.find((item) => item.id === 'hb-4c-shield')!
+hb4.coils = [
+  { id: 'north', start: 'north-start', finish: 'north-finish' },
+  { id: 'south', start: 'south-start', finish: 'south-finish' },
+]
+
+for (const id of ['push-pull-dpdt', 'push-push-dpdt']) {
+  const part = catalog.find((item) => item.id === id)!
+  part.source =
+    id === 'push-pull-dpdt'
+      ? 'Bourns PDB183-GTR (DPDT push-pull)'
+      : 'Bourns PDB185-GTR (DPDT latching push)'
+  part.sourceUrl =
+    'https://www.bourns.com/docs/product-datasheets/' +
+    (id === 'push-pull-dpdt' ? 'PDB183' : 'PDB185') +
+    '-GTR.pdf'
+  part.limitation =
+    'Separate potentiometer and generic DPDT contacts. A/B do not specify the lug orientation of a physical part.'
+}
+catalog.find((item) => item.id === 'dpdt-on-on-on')!.limitation =
+  'Generic type-A matrix: centre closes A2-A1 and B2-B3. Other manufacturers and variants differ; verify continuity.'
+
+for (const part of catalog) if (part.category === 'Pickups') part.behavior = 'pickup'
+// Structural analysis support: every catalogued control has the same finite pot-track model.
+for (const part of catalog) if (part.category === 'Controls') part.behavior = 'potentiometer'
+
+// Explicit runtime model coverage; absent models must never be silently verified.
+for (const part of catalog) {
+  if (part.category === 'Pickups') part.electricalModel = 'pickup'
+  else if (part.behavior === 'potentiometer') part.electricalModel = 'potentiometer'
+  else if (['capacitor', 'resistor', 'treble-bleed'].includes(part.id))
+    part.electricalModel = 'passive'
+  else if (['mono-jack', 'stereo-jack'].includes(part.id)) part.electricalModel = 'output'
+  else if (['junction', 'bridge-ground', 'shield'].includes(part.id))
+    part.electricalModel = 'ground'
+  else if (part.contactModel) part.electricalModel = 'contacts'
+}

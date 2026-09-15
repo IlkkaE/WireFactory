@@ -9,7 +9,14 @@ import {
   type Wire,
   type WireFactoryDocument,
 } from './circuit/model'
-import { starterDocument } from './circuit/template'
+import {
+  fiveWaySingleCoilDocument,
+  masterVolumeDocument,
+  seriesParallelDocument,
+  splitDocument,
+  starterDocument,
+} from './circuit/template'
+import { electricalFingerprint, resolve, type ResolvedCircuit } from './circuit/resolver'
 
 type State = {
   doc: WireFactoryDocument
@@ -19,6 +26,8 @@ type State = {
   selectedWire: string | null
   pendingTerminal: string | null
   controls: ControlState
+  checks: Record<string, ResolvedCircuit>
+  check: () => void
   commit: (next: WireFactoryDocument) => void
   move: (id: string, x: number, y: number) => void
   add: (definitionId: string) => void
@@ -27,14 +36,25 @@ type State = {
   removeWire: (id: string) => void
   open: (text: string) => void
   reset: () => void
+  newMasterVolume: () => void
+  newSplit: (kind: 'push-pull-dpdt' | 'push-push-dpdt') => void
+  newFiveWay: () => void
+  newSeriesParallel: () => void
+  selectedDiagnostic: number | null
+  setSelectedDiagnostic: (index: number | null) => void
   undo: () => void
   redo: () => void
   setSelected: (id: string | null) => void
   setSelectedWire: (id: string | null) => void
   setPendingTerminal: (key: string | null) => void
+  setComponentState: (id: string, value: string) => void
   setControl: <Key extends keyof ControlState>(key: Key, value: ControlState[Key]) => void
 }
 
+const selectorForDoc = (doc: WireFactoryDocument): ControlState['selector'] => {
+  const value = doc.instances.find((item) => item.values.control === 'selector')?.controlState
+  return value === 'neck' || value === 'bridge' ? value : 'middle'
+}
 const clone = (doc: WireFactoryDocument) => structuredClone(doc)
 const randomId = () => crypto.randomUUID().slice(0, 8)
 
@@ -50,8 +70,11 @@ const inferWireRole = (doc: WireFactoryDocument, from: string, to: string): Wire
   const roles = [roleForTerminal(doc, from), roleForTerminal(doc, to)]
   if (roles.includes('shield')) return 'shield'
   if (roles.some((role) => role === 'ground' || role === 'sleeve')) return 'ground'
-  const instanceIds = [splitTerminalKey(from)[0], splitTerminalKey(to)[0]]
-  if (instanceIds.some((id) => id === 'tone' || id === 'cap')) return 'tone'
+  const terminals = [from, to].map((key) => {
+    const [instanceId] = splitTerminalKey(key)
+    return doc.instances.find((item) => item.id === instanceId)?.values.control
+  })
+  if (terminals.includes('tone')) return 'tone'
   return 'signal'
 }
 
@@ -66,12 +89,28 @@ export const useCircuitStore = create<State>((set, get) => ({
   selectedWire: null,
   pendingTerminal: null,
   controls: { ...DEFAULT_CONTROLS },
+  checks: {},
+  selectedDiagnostic: null,
+  check: () => {
+    const state = get()
+    const fingerprint = electricalFingerprint(state.doc, state.controls)
+    set({ checks: {}, selectedDiagnostic: null })
+    const result = resolve(state.doc, state.controls)
+    set({ checks: { [fingerprint]: result } })
+  },
   commit: (next) =>
-    set((state) => ({
-      doc: clone(next),
-      past: [...state.past, clone(state.doc)].slice(-80),
-      future: [],
-    })),
+    set((state) => {
+      const controls = { ...state.controls, selector: selectorForDoc(next) }
+      const changed =
+        electricalFingerprint(state.doc, state.controls) !== electricalFingerprint(next, controls)
+      return {
+        doc: clone(next),
+        controls,
+        past: [...state.past, clone(state.doc)].slice(-80),
+        future: [],
+        ...(changed ? { selectedDiagnostic: null } : {}),
+      }
+    }),
   move: (id, x, y) => {
     const doc = clone(get().doc)
     const item = doc.instances.find((entry) => entry.id === id)
@@ -107,9 +146,8 @@ export const useCircuitStore = create<State>((set, get) => ({
     doc.wires = doc.wires.filter(
       (wire) => !wire.from.startsWith(`${id}:`) && !wire.to.startsWith(`${id}:`),
     )
-    doc.expectation = null
     get().commit(doc)
-    set({ selected: null, selectedWire: null })
+    set({ selected: null, selectedWire: null, pendingTerminal: null })
   },
   wire: (from, to) => {
     if (from === to) return
@@ -148,7 +186,9 @@ export const useCircuitStore = create<State>((set, get) => ({
       selected: null,
       selectedWire: null,
       pendingTerminal: null,
-      controls: { ...DEFAULT_CONTROLS },
+      controls: { ...DEFAULT_CONTROLS, selector: selectorForDoc(parsed) },
+      checks: {},
+      selectedDiagnostic: null,
     }))
   },
   reset: () => {
@@ -158,6 +198,52 @@ export const useCircuitStore = create<State>((set, get) => ({
       selectedWire: null,
       pendingTerminal: null,
       controls: { ...DEFAULT_CONTROLS },
+      checks: {},
+      selectedDiagnostic: null,
+    })
+  },
+  newMasterVolume: () => {
+    get().commit(masterVolumeDocument())
+    set({
+      selected: null,
+      selectedWire: null,
+      pendingTerminal: null,
+      controls: { ...DEFAULT_CONTROLS },
+      checks: {},
+      selectedDiagnostic: null,
+    })
+  },
+  newFiveWay: () => {
+    get().commit(fiveWaySingleCoilDocument())
+    set({
+      selected: null,
+      selectedWire: null,
+      pendingTerminal: null,
+      controls: { ...DEFAULT_CONTROLS },
+      checks: {},
+      selectedDiagnostic: null,
+    })
+  },
+  newSeriesParallel: () => {
+    get().commit(seriesParallelDocument())
+    set({
+      selected: null,
+      selectedWire: null,
+      pendingTerminal: null,
+      controls: { ...DEFAULT_CONTROLS },
+      checks: {},
+      selectedDiagnostic: null,
+    })
+  },
+  newSplit: (kind) => {
+    get().commit(splitDocument(kind))
+    set({
+      selected: null,
+      selectedWire: null,
+      pendingTerminal: null,
+      controls: { ...DEFAULT_CONTROLS },
+      checks: {},
+      selectedDiagnostic: null,
     })
   },
   undo: () =>
@@ -166,10 +252,20 @@ export const useCircuitStore = create<State>((set, get) => ({
       return previous
         ? {
             doc: clone(previous),
+            selectedDiagnostic:
+              electricalFingerprint(state.doc, state.controls) ===
+              electricalFingerprint(previous, {
+                ...state.controls,
+                selector: selectorForDoc(previous),
+              })
+                ? state.selectedDiagnostic
+                : null,
+            controls: { ...state.controls, selector: selectorForDoc(previous) },
             past: state.past.slice(0, -1),
             future: [clone(state.doc), ...state.future].slice(0, 80),
             selected: null,
             selectedWire: null,
+            pendingTerminal: null,
           }
         : {}
     }),
@@ -179,15 +275,55 @@ export const useCircuitStore = create<State>((set, get) => ({
       return next
         ? {
             doc: clone(next),
+            selectedDiagnostic:
+              electricalFingerprint(state.doc, state.controls) ===
+              electricalFingerprint(next, { ...state.controls, selector: selectorForDoc(next) })
+                ? state.selectedDiagnostic
+                : null,
+            controls: { ...state.controls, selector: selectorForDoc(next) },
             past: [...state.past, clone(state.doc)].slice(-80),
             future: state.future.slice(1),
             selected: null,
             selectedWire: null,
+            pendingTerminal: null,
           }
         : {}
+    }),
+  setSelectedDiagnostic: (selectedDiagnostic) =>
+    set((state) => {
+      const result = state.checks[electricalFingerprint(state.doc, state.controls)]
+      return {
+        selectedDiagnostic:
+          selectedDiagnostic !== null &&
+          Number.isInteger(selectedDiagnostic) &&
+          result?.diagnostics[selectedDiagnostic]
+            ? selectedDiagnostic
+            : null,
+      }
     }),
   setSelected: (selected) => set({ selected, selectedWire: null }),
   setSelectedWire: (selectedWire) => set({ selectedWire, selected: null }),
   setPendingTerminal: (pendingTerminal) => set({ pendingTerminal }),
-  setControl: (key, value) => set((state) => ({ controls: { ...state.controls, [key]: value } })),
+  setComponentState: (id, value) => {
+    const doc = clone(get().doc)
+    const item = doc.instances.find((entry) => entry.id === id)
+    if (
+      !item ||
+      item.controlState === value ||
+      !definition(item.definitionId)?.contactModel?.states.some((state) => state.id === value)
+    )
+      return
+    item.controlState = value
+    get().commit(doc)
+  },
+  setControl: (key, value) => {
+    if (key === 'selector') {
+      const item = get().doc.instances.find((item) => item.values.control === 'selector')
+      if (item) {
+        get().setComponentState(item.id, value)
+        return
+      }
+    }
+    set((state) => ({ controls: { ...state.controls, [key]: value }, selectedDiagnostic: null }))
+  },
 }))

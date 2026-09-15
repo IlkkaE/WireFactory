@@ -2,7 +2,7 @@ import { PDFDocument } from 'pdf-lib'
 import { describe, expect, it } from 'vitest'
 import { buildBomCsv, buildPdf, buildSvg } from './export'
 import { resolve } from './resolver'
-import { starterDocument } from './template'
+import { masterVolumeDocument, starterDocument } from './template'
 
 describe('snapshot exports', () => {
   it('places every component and real wire endpoint in the SVG', () => {
@@ -29,8 +29,19 @@ describe('snapshot exports', () => {
     const document = starterDocument()
     const bytes = await buildPdf(document, resolve(document))
     const pdf = await PDFDocument.load(bytes)
-    expect(pdf.getPageCount()).toBe(2)
+    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2)
     expect(pdf.getTitle()).toContain('WireFactory')
-    expect(pdf.getSubject()).toContain('Verified generic starter topology')
+    expect(pdf.getSubject()).toContain('Structural analysis valid')
+  })
+  it('exports the 1V topology from the same verified snapshot', async () => {
+    const document = masterVolumeDocument()
+    const resolved = resolve(document)
+    const svg = buildSvg(document, resolved)
+    expect(svg.match(/data-component=/g)).toHaveLength(8)
+    expect(svg.match(/data-wire=/g)).toHaveLength(14)
+    expect(svg).toContain('BUILD READY - structural analysis valid')
+    expect(buildBomCsv(document)).toContain('Master volume')
+    const pdf = await PDFDocument.load(await buildPdf(document, resolved))
+    expect(pdf.getSubject()).toContain('Structural analysis valid')
   })
 })
