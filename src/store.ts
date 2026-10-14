@@ -13,6 +13,9 @@ import {
   fiveWaySingleCoilDocument,
   masterVolumeDocument,
   seriesParallelDocument,
+  splitCoilMonoDocument,
+  splitCoilPushPullDocument,
+  splitCoilStereoDocument,
   splitDocument,
   starterDocument,
 } from './circuit/template'
@@ -40,6 +43,7 @@ type State = {
   newSplit: (kind: 'push-pull-dpdt' | 'push-push-dpdt') => void
   newFiveWay: () => void
   newSeriesParallel: () => void
+  newSplitCoil: (kind: 'stereo' | 'mono' | 'pushpull') => void
   selectedDiagnostic: number | null
   setSelectedDiagnostic: (index: number | null) => void
   undo: () => void
@@ -226,6 +230,23 @@ export const useCircuitStore = create<State>((set, get) => ({
   },
   newSeriesParallel: () => {
     get().commit(seriesParallelDocument())
+    set({
+      selected: null,
+      selectedWire: null,
+      pendingTerminal: null,
+      controls: { ...DEFAULT_CONTROLS },
+      checks: {},
+      selectedDiagnostic: null,
+    })
+  },
+  newSplitCoil: (kind) => {
+    get().commit(
+      kind === 'stereo'
+        ? splitCoilStereoDocument()
+        : kind === 'mono'
+          ? splitCoilMonoDocument()
+          : splitCoilPushPullDocument(),
+    )
     set({
       selected: null,
       selectedWire: null,

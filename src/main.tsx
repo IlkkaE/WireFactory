@@ -257,6 +257,11 @@ function App() {
               <option value="push">Dual split / push-push</option>
               <option value="fiveway">3S / 5-way / 1V / 1T</option>
               <option value="seriesparallel">2S / Parallel-Series / 1V / 1T</option>
+              <option value="splitstereo">Split-coil / stereo TRS / 2V / 2T</option>
+              <option value="splitmono">Split-coil / mono series-parallel / kill</option>
+              <option value="splitpushpull">
+                Split-coil / TRS / push-pull mono-stereo + series-parallel
+              </option>
             </select>
           </label>
           <button
@@ -265,6 +270,9 @@ function App() {
               else if (preset === 'master') state.newMasterVolume()
               else if (preset === 'fiveway') state.newFiveWay()
               else if (preset === 'seriesparallel') state.newSeriesParallel()
+              else if (preset === 'splitstereo') state.newSplitCoil('stereo')
+              else if (preset === 'splitmono') state.newSplitCoil('mono')
+              else if (preset === 'splitpushpull') state.newSplitCoil('pushpull')
               else state.newSplit(preset === 'pull' ? 'push-pull-dpdt' : 'push-push-dpdt')
             }}
           >
