@@ -362,7 +362,7 @@ test('component dropdowns expose all 32 parts and only Add edits the board', asy
 test('preset selection waits for Load and supports reloading the same preset', async ({ page }) => {
   await page.goto('/wirefactory/')
   const preset = page.getByLabel('Preset', { exact: true })
-  await expect(preset.locator('option')).toHaveCount(6)
+  await expect(preset.locator('option')).toHaveCount(9)
   await preset.selectOption('pull')
   await expect(page.locator('[data-component-id]')).toHaveCount(9)
   await page.getByRole('button', { name: 'Load preset', exact: true }).click()
